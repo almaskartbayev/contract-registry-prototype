@@ -16,6 +16,19 @@ const defaults = { NDA: { code: 'NDA', next: 49 }, 'Меморандум': { cod
 let series = JSON.parse(localStorage.getItem('registrySeries') || 'null') || defaults;
 let tab = 'Все';
 const el = id => document.getElementById(id);
+const switchStyle = document.createElement('style');
+switchStyle.textContent = `.deadline-switch{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fbfcfb}.deadline-label{font-size:10px;color:var(--muted);font-weight:700}.deadline-segments{display:flex;position:relative;background:#edf1ed;border-radius:8px;padding:3px;gap:2px}.deadline-segments button{position:relative;z-index:1;min-width:142px;border:0;border-radius:6px;background:transparent;padding:8px 11px;color:#65736a;font-size:10px;font-weight:700;transition:color .15s}.deadline-segments button.active{background:#fff;color:var(--green);box-shadow:0 1px 4px #17261f1c}.deadline-segments button.active[data-view=overdue]{color:#b33c32}.deadline-segments .count{margin-left:5px}@media(max-width:650px){.deadline-switch{align-items:flex-start;flex-direction:column;gap:7px}.deadline-segments{width:100%}.deadline-segments button{min-width:0;flex:1;padding:8px 4px;font-size:9px}}`;
+document.head.appendChild(switchStyle);
+const deadlineSwitch = document.createElement('div');
+deadlineSwitch.className = 'deadline-switch';
+deadlineSwitch.innerHTML = `<span class="deadline-label">КОНТРОЛЬ СРОКОВ</span><div class="deadline-segments"><button type="button" data-view="soon">Срок истекает <span class="count" id="switchSoonCount">0</span></button><button type="button" data-view="overdue">Просрочено <span class="count" id="switchOverCount">0</span></button></div>`;
+const tabsContainer = document.querySelector('.tabs');
+tabsContainer.parentElement.insertBefore(deadlineSwitch, tabsContainer.nextSibling);
+document.querySelectorAll('.tab[data-tab="Скоро истекают"],.tab[data-tab="Просрочены"]').forEach(button => button.style.display = 'none');
+deadlineSwitch.querySelectorAll('button').forEach(button => button.onclick = () => {
+  const tabButton = document.querySelector(`.tab[data-tab="${button.dataset.view === 'soon' ? 'Скоро истекают' : 'Просрочены'}"]`);
+  tabButton.click();
+});
 const fmtDate = value => value ? new Date(value + 'T00:00:00').toLocaleDateString('ru-RU') : '—';
 const daysLeft = value => value ? Math.ceil((new Date(value + 'T00:00:00') - today) / 86400000) : null;
 function render() {
@@ -23,6 +36,8 @@ function render() {
   const soonCount = docs.filter(x => daysLeft(x.expiry) >= 0 && daysLeft(x.expiry) <= 30).length;
   const overCount = docs.filter(x => daysLeft(x.expiry) < 0).length;
   el('soonCount').textContent = soonCount; el('overCount').textContent = overCount; el('attention').textContent = soonCount + overCount;
+  el('switchSoonCount').textContent = soonCount; el('switchOverCount').textContent = overCount;
+  deadlineSwitch.querySelectorAll('button').forEach(button => button.classList.toggle('active', (tab === 'Скоро истекают' && button.dataset.view === 'soon') || (tab === 'Просрочены' && button.dataset.view === 'overdue')));
   let rows = docs.filter(x => (tab === 'Все' || x.cat === tab || (tab === 'Скоро истекают' && daysLeft(x.expiry) >= 0 && daysLeft(x.expiry) <= 30) || (tab === 'Просрочены' && daysLeft(x.expiry) < 0) || (tab === 'Другие сроки' && x.action)) && (!q || [x.name, x.no, x.party, x.owner].some(v => (v || '').toLowerCase().includes(q))) && (!kind || x.type === kind) && (!bin || x.bin.includes(bin)) && (!source || x.src === source) && (!date || x.date >= date));
   const priority = x => { const n = daysLeft(x.expiry); return n !== null && n < 0 ? n : n !== null && n <= 30 ? n : 9999; };
   rows.sort((a, b) => priority(a) - priority(b));
